@@ -5,8 +5,8 @@
 #include <iostream>
 #include <thread>
 #include <vector>
-#include "Eigen/Core"
-#include "Eigen/QR"
+//#include "Eigen/Core"
+//#include "Eigen/QR"
 #include "json.hpp"
 
 #include "vehicle.h"
@@ -63,6 +63,10 @@ int main() {
                 string event = j[0].get<string>();
 
                 if (event == "telemetry") {
+                    cout << "########################" <<endl;
+                    cout << "global_counter = "<<global_counter<<endl;
+                    cout << "########################" <<endl;
+                    global_counter += 1;
                     // j[1] is the data JSON object
 
                     // Main car's localization Data
@@ -83,6 +87,13 @@ int main() {
                     // Sensor Fusion Data, a list of all other cars on the same side of the road.
                     auto sensor_fusion = j[1]["sensor_fusion"];
 
+                    /***** my codes *****/
+                    vector<double> ego_car_data = {car_x, car_y, car_s, car_d, car_yaw, car_speed*0.447}; // update car_speed from mph to m/s
+
+                    vector<vector<double>> next_path = ego_car.update(ego_car_data, sensor_fusion,
+                                                                      previous_path_x, previous_path_y,
+                                                                      end_path_s, end_path_d);
+                    /***** end, my codes *****/
                     json msgJson;
 
                     vector<double> next_x_vals;
@@ -90,8 +101,8 @@ int main() {
 
 
                     // TODO: define a path made up of (x,y) points that the car will visit sequentially every .02 seconds
-                    msgJson["next_x"] = next_x_vals;
-                    msgJson["next_y"] = next_y_vals;
+                    msgJson["next_x"] = next_path[0];
+                    msgJson["next_y"] = next_path[1];
 
                     auto msg = "42[\"control\"," + msgJson.dump() + "]";
 
