@@ -9,7 +9,8 @@
 #define MAP_TOTAL_WAYPOINT 181
 #define MAP_S_LENGTH 6945.554       // track length = 6945.544 meters
 #define MAP_LANE_WIDTH 4            // meters
-#define SENSOR_RANGE 400 //meter
+#define LANES_NUMBER                // how many lanes
+#define SENSOR_RANGE 100 //meter
 
 
 #define SIM_DT 0.02  // s
