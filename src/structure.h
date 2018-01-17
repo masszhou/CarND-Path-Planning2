@@ -5,6 +5,10 @@
 #ifndef PATH_PLANNING_STRUCTURE_H
 #define PATH_PLANNING_STRUCTURE_H
 
+#include <string>
+
+using namespace std;
+
 struct CarStatus{
     double x;
     double y;
@@ -18,6 +22,7 @@ struct CarStatus{
     double a_yaw;
     double a_s;
     double a_d;
+    string state;
 };
 
 #endif //PATH_PLANNING_STRUCTURE_H

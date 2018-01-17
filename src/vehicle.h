@@ -23,11 +23,19 @@ public:
                                   vector<double> previous_path_x, vector<double> previous_path_y,
                                   double end_path_s, double end_path_d);
 
+    vector<string> successor_states();
+
     vector<vector<double>> generate_trajectory(double v_desired, vector<vector<double>> waypoints,
                                                    vector<double> previous_path_x, vector<double> previous_path_y);
 
     vector<vector<double>>
     generate_KL_trajectory(const map<int, Vehicle>& preds, vector<double> previous_path_x, vector<double> previous_path_y);
+
+    vector<vector<double>> get_waypoint(vector<double> param);
+
+    vector<double> get_KL_param(const map<int, Vehicle>& preds);
+    vector<double> get_LCL_param(const map<int, Vehicle>& preds);
+    vector<double> get_LCR_param(const map<int, Vehicle>& preds);
 
     vector<vector<double>>
     generate_LCL_trajectory(const map<int, Vehicle> &preds, vector<double> previous_path_x,
@@ -36,7 +44,7 @@ public:
     vector<vector<double>>
     generate_LCR_trajectory(const map<int, Vehicle>& preds, vector<double> previous_path_x, vector<double> previous_path_y);
 
-    vector<double> get_kinematics_in_given_lane(const map<int, Vehicle> &preds, int lane_id);
+    vector<double> get_kinematics(const map<int, Vehicle> &preds, int lane_id);
 
     map<int, Vehicle> predict_other_vehicles(const vector<vector<double>> &sensor_fusion, double duration);
     bool get_vehicle_ahead(const map<int, Vehicle> &preds, int lane, Vehicle &r_vehicle);

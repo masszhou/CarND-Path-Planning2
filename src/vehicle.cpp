@@ -10,6 +10,7 @@
 #include "constants.h"
 
 Vehicle::Vehicle() {
+    this->status.state = "KL";
     this->status.v_yaw_desired = 5;
 }
 
@@ -39,6 +40,74 @@ Vehicle::update(vector<double> ego_car_data, vector<vector<double>> sensor_fusio
     double duration = (double)previous_path_x.size() * (double)SIM_DT;
     map<int, Vehicle> preds = predict_other_vehicles(sensor_fusion, duration);
 
+    // evaluate next feasible state and trajectory
+    vector<string> next_states = this->successor_states();
+    vector<vector<double>> next_trajectory;
+
+    double v_best = 0;
+    string next_state;
+    vector<double> next_param;
+    vector<vector<double>> next_wps;
+    vector<vector<double>> next_traj;
+
+    for (auto state : next_states){
+        vector<double> candidates_param;
+
+        if (state == "KL"){
+            cout << "[update] KL" << endl;
+            candidates_param = get_KL_param(preds);
+            cout << "[update] KL, feasible s, d, v_feasible, v_target = ";
+            for(auto each : candidates_param){
+                cout << each << ", ";
+            }
+            cout << endl;
+
+            if (candidates_param[3] > v_best){
+                v_best = candidates_param[3];
+                next_param = candidates_param;
+                next_state = "KL";
+            }
+
+        }else if (state == "LCL"){
+            cout << "[update] LCL" << endl;
+            candidates_param = get_LCL_param(preds);
+            cout << "[update] LCL, feasible s, d, v_feasible, v_target = ";
+            for(auto each : candidates_param){
+                cout << each << ", ";
+            }
+            cout << endl;
+
+            if (candidates_param[3] > v_best){
+                v_best = candidates_param[3];
+                next_param = candidates_param;
+                next_state = "LCL";
+            }
+
+        }else if (state =="LCR"){
+            cout << "[update] LCR" << endl;
+            candidates_param = get_LCR_param(preds);
+            cout << "[update] LCR, feasible s, d, v_feasible, v_target = ";
+            for(auto each : candidates_param){
+                cout << each << ", ";
+            }
+            cout << endl;
+
+            if (candidates_param[3] > v_best){
+                v_best = candidates_param[3];
+                next_param = candidates_param;
+                next_state = "LCR";
+            }
+        }
+    }
+    cout << "next_state, s, d, v_desired, v_target = " << next_state << ", ";
+    for (auto each : next_param){
+        cout << each << ", ";
+    }
+    cout << endl;
+    next_wps = get_waypoint(next_param);
+    next_trajectory = generate_trajectory(next_param[2], next_wps, previous_path_x, previous_path_y);
+    this->status.v_yaw_desired = next_param[2];
+
     //---- drive in straight
 //    vector<double> wp0 = {this->status.s + 30, 6};
 //    vector<double> wp1 = {this->status.s + 60, 6};
@@ -49,16 +118,30 @@ Vehicle::update(vector<double> ego_car_data, vector<vector<double>> sensor_fusio
     vector<vector<double>> dummy_trajectory;
     dummy_trajectory = generate_KL_trajectory(preds, previous_path_x, previous_path_y);
 
-    if (this->status.v_yaw < 10 ){
-        dummy_trajectory = generate_KL_trajectory(preds, previous_path_x, previous_path_y);
-    } else{
-        dummy_trajectory = generate_LCL_trajectory(preds, previous_path_x, previous_path_y);
-    }
+//    if (this->status.v_yaw < 10 ){
+//        dummy_trajectory = generate_KL_trajectory(preds, previous_path_x, previous_path_y);
+//    } else{
+//        dummy_trajectory = generate_LCL_trajectory(preds, previous_path_x, previous_path_y);
+//    }
 
 
-    return dummy_trajectory;
+    return next_trajectory;
 }
 
+vector<string> Vehicle::successor_states() {
+    vector<string> states;
+    states.push_back("KL");
+    string state = this->status.state;
+    if (state.compare("KL") == 0) {
+        states.push_back("LCL");
+        states.push_back("LCR");
+    } else if (state.compare("LCL") == 0) {
+        states.push_back("LCL");
+    } else if (state.compare("LCR") == 0) {
+        states.push_back("LCR");
+    }
+    return states;
+}
 
 vector<vector<double>>
 Vehicle::generate_trajectory(double v_desired, vector<vector<double>> waypoints,
@@ -174,35 +257,36 @@ Vehicle::generate_trajectory(double v_desired, vector<vector<double>> waypoints,
 }
 
 
-vector<double> Vehicle::get_kinematics_in_given_lane(const map<int, Vehicle> &preds, int lane_id) {
+vector<double> Vehicle::get_kinematics(const map<int, Vehicle> &preds, int lane_id) {
 
     double v_feasible = this->status.v_yaw_desired;
     double dist_feasible = SENSOR_RANGE; // obstacle free with sensor range in give lane
+//    cout << "[get_kinematics] last v_feasible = " << v_feasible << endl;
 
     //---- ahead collision test
     Vehicle car_ahead;
     double v_target = MAX_SPEED;
     if (get_vehicle_ahead(preds, lane_id, car_ahead)){
         double dist = car_ahead.status.s - this->status.s;
-        cout << "[get_feasible_speed] found car ahead, dist = " << dist << ", v = " << car_ahead.status.v_yaw << endl;
+//        cout << "[get_kinematics] found car ahead, dist = " << dist << ", v = " << car_ahead.status.v_yaw << endl;
 
         if (dist < 50 && dist > 25){
             v_target = car_ahead.status.v_yaw;
-            cout << "[get_feasible_speed] follow with v_target = " << v_target << endl;
+//            cout << "[get_kinematics] follow with v_target = " << v_target << endl;
         } else if (dist < 25 && dist > 10){
             // lower speed to avoid crash
             v_target = car_ahead.status.v_yaw -1; // [m/s]
-            cout << "[get_feasible_speed] slow down and follow with v_target = "<< v_target << endl;
+//            cout << "[get_kinematics] slow down and follow with v_target = "<< v_target << endl;
         } else if (dist < 10){
             v_target = car_ahead.status.v_yaw -2;
             this->status.v_yaw_desired -= 5 * 0.02;
-            cout << "[get_feasible_speed] break with v_target = " << v_target << endl;
+//            cout << "[get_kinematics] break with v_target = " << v_target << endl;
         } else {
-            cout << "[get_feasible_speed] free with v_target = " << v_target << endl;
+//            cout << "[get_kinematics] free with v_target = " << v_target << endl;
         }
 
     } else {
-        cout << "[get_feasible_speed] free with v_target = " << v_target << endl;
+//        cout << "[get_kinematics] free with v_target = " << v_target << endl;
     }
 
     // about magic number 0.224 in Aaron's code
@@ -220,8 +304,9 @@ vector<double> Vehicle::get_kinematics_in_given_lane(const map<int, Vehicle> &pr
         v_feasible -= MAX_JERK * SIM_DT;
         v_feasible = max(v_feasible, (double)0);
     }
+//    cout << "[get_kinematics] next v_feasible = " << v_feasible << endl;
 
-    return {v_feasible, dist_feasible};
+    return {dist_feasible, v_feasible, v_target};
 }
 
 vector<vector<double>>
@@ -231,21 +316,71 @@ Vehicle::generate_KL_trajectory(const map<int, Vehicle>& preds, vector<double> p
     lane_id = max(lane_id, 0);
     double d_target = lane_id*MAP_LANE_WIDTH + 0.5*MAP_LANE_WIDTH;
 
-    vector<double> kinematics = this->get_kinematics_in_given_lane(preds, this->get_lane_id());
-    this->status.v_yaw_desired = kinematics[0];
-    double s_delta = kinematics[1]/3;
-    cout << "[generate_KL_trajectory] s_delta = " << s_delta << endl;
+    vector<double> kinematics = this->get_kinematics(preds, this->get_lane_id());
+    this->status.v_yaw_desired = kinematics[1];
+    double s_delta = kinematics[0]/3;
+//    cout << "[generate_KL_trajectory] s_delta = " << s_delta << endl;
     //---- drive in straight
     vector<double> wp0 = {this->status.s + 30, d_target};
     vector<double> wp1 = {this->status.s + 30 + s_delta, d_target};
     vector<double> wp2 = {this->status.s + 30 + 2*s_delta, d_target};
 
     vector<vector<double>> waypoints = {wp0, wp1, wp2};
-    cout << "[generate_KL_trajectory] ego car.v_yaw_desired = " << this->status.v_yaw_desired << endl;
+//    cout << "[generate_KL_trajectory] ego car.v_yaw_desired = " << this->status.v_yaw_desired << endl;
 
     vector<vector<double>> new_trajactory = generate_trajectory(this->status.v_yaw_desired, waypoints, previous_path_x, previous_path_y);
 
     return new_trajactory;
+}
+
+
+vector<double> Vehicle::get_KL_param(const map<int, Vehicle> &preds) {
+    int lane_id = this->get_lane_id();
+    lane_id = max(lane_id, 0); // larger than 0
+    lane_id = min(lane_id, 2); // smaller then 2
+
+    double d_target = lane_id*MAP_LANE_WIDTH + 0.5*MAP_LANE_WIDTH;
+    vector<double> kinematics = this->get_kinematics(preds, lane_id);
+
+    return {kinematics[0], d_target, kinematics[1], kinematics[2]};
+}
+
+vector<double> Vehicle::get_LCL_param(const map<int, Vehicle> &preds) {
+    int lane_id = this->get_lane_id() - 1;
+    if (lane_id < 0){
+        return {-1, -1, -1, -1};
+    }
+
+    double d_target = lane_id*MAP_LANE_WIDTH + 0.5*MAP_LANE_WIDTH;
+    vector<double> kinematics = this->get_kinematics(preds, lane_id);
+
+    return {kinematics[0], d_target, kinematics[1], kinematics[2]};
+}
+
+vector<double> Vehicle::get_LCR_param(const map<int, Vehicle> &preds) {
+    int lane_id = this->get_lane_id() + 1;
+    if (lane_id > 2){
+        return {-1, -1, -1, -1};
+    }
+
+    double d_target = lane_id*MAP_LANE_WIDTH + 0.5*MAP_LANE_WIDTH;
+    vector<double> kinematics = this->get_kinematics(preds, lane_id);
+
+    return {kinematics[0], d_target, kinematics[1], kinematics[2]};
+}
+
+vector<vector<double>> Vehicle::get_waypoint(vector<double> param) {
+    double s_delta = param[0]/3;
+    double d_target = param[1];
+
+    //---- drive in straight
+    vector<double> wp0 = {this->status.s + 30, d_target};
+    vector<double> wp1 = {this->status.s + 30 + s_delta, d_target};
+    vector<double> wp2 = {this->status.s + 30 + 2*s_delta, d_target};
+
+    vector<vector<double>> waypoints = {wp0, wp1, wp2};
+
+    return waypoints;
 }
 
 vector<vector<double>>
@@ -255,9 +390,9 @@ Vehicle::generate_LCL_trajectory(const map<int, Vehicle> &preds, vector<double> 
     lane_id = max(lane_id, 0);
     double d_target = lane_id*MAP_LANE_WIDTH + 0.5*MAP_LANE_WIDTH;
 
-    vector<double> kinematics = this->get_kinematics_in_given_lane(preds, lane_id);
-    this->status.v_yaw_desired = kinematics[0];
-    double s_delta = kinematics[1]/3;
+    vector<double> kinematics = this->get_kinematics(preds, lane_id);
+    this->status.v_yaw_desired = kinematics[1];
+    double s_delta = kinematics[0]/3;
 
 
     vector<double> wp0 = {this->status.s + 30, d_target}; // suppose 30m spline interpolation is limited by lateral acceleration
@@ -279,9 +414,9 @@ Vehicle::generate_LCR_trajectory(const map<int, Vehicle> &preds, vector<double> 
     lane_id = min(lane_id, LANES_NUMBER-1);
     double d_target = lane_id*MAP_LANE_WIDTH + 0.5*MAP_LANE_WIDTH;
 
-    vector<double> kinematics = this->get_kinematics_in_given_lane(preds, lane_id);
-    this->status.v_yaw_desired = kinematics[0];
-    double s_delta = kinematics[1]/3;
+    vector<double> kinematics = this->get_kinematics(preds, lane_id);
+    this->status.v_yaw_desired = kinematics[1];
+    double s_delta = kinematics[0]/3;
 
     vector<double> wp0 = {this->status.s + 30, d_target}; // suppose 30m spline interpolation is limited by lateral acceleration
     vector<double> wp1 = {this->status.s + 30 + s_delta, d_target};
@@ -354,5 +489,8 @@ map<int, Vehicle> Vehicle::predict_other_vehicles(const vector<vector<double>> &
 
     return preds;
 }
+
+
+
 
 
