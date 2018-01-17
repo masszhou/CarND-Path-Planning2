@@ -13,9 +13,9 @@
 #define SENSOR_RANGE 100 //meter
 
 
-#define SIM_DT 0.02  // s
-#define MAX_SPEED 22 //m/s
-#define MAX_JERK 5 //m/s/s/s
-
+#define SIM_DT 0.02  // [s]
+#define MAX_SPEED 22 // [m/s]
+#define MAX_JERK 10 // [m/s/s/s], due to project specification
+#define MAX_ACCEL 10 // [m/s]
 
 #endif //PATH_PLANNING_CONSTANTS_H

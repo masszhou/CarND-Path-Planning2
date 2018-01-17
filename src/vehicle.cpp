@@ -54,7 +54,6 @@ Vehicle::update(vector<double> ego_car_data, vector<vector<double>> sensor_fusio
         vector<double> candidates_param;
 
         if (state == "KL"){
-            cout << "[update] KL" << endl;
             candidates_param = get_KL_param(preds);
             cout << "[update] KL, feasible s, d, v_feasible, v_target = ";
             for(auto each : candidates_param){
@@ -69,7 +68,6 @@ Vehicle::update(vector<double> ego_car_data, vector<vector<double>> sensor_fusio
             }
 
         }else if (state == "LCL"){
-            cout << "[update] LCL" << endl;
             candidates_param = get_LCL_param(preds);
             cout << "[update] LCL, feasible s, d, v_feasible, v_target = ";
             for(auto each : candidates_param){
@@ -84,7 +82,6 @@ Vehicle::update(vector<double> ego_car_data, vector<vector<double>> sensor_fusio
             }
 
         }else if (state =="LCR"){
-            cout << "[update] LCR" << endl;
             candidates_param = get_LCR_param(preds);
             cout << "[update] LCR, feasible s, d, v_feasible, v_target = ";
             for(auto each : candidates_param){
@@ -99,31 +96,17 @@ Vehicle::update(vector<double> ego_car_data, vector<vector<double>> sensor_fusio
             }
         }
     }
-    cout << "next_state, s, d, v_desired, v_target = " << next_state << ", ";
+    cout << "[update] next_state, s, d, v_desired, v_target = " << next_state << ", ";
     for (auto each : next_param){
         cout << each << ", ";
     }
     cout << endl;
     next_wps = get_waypoint(next_param);
     next_trajectory = generate_trajectory(next_param[2], next_wps, previous_path_x, previous_path_y);
+
+    // update new state
     this->status.v_yaw_desired = next_param[2];
-
-    //---- drive in straight
-//    vector<double> wp0 = {this->status.s + 30, 6};
-//    vector<double> wp1 = {this->status.s + 60, 6};
-//    vector<double> wp2 = {this->status.s + 90, 6};
-//    vector<vector<double>> waypoints = {wp0, wp1, wp2};
-//    vector<vector<double>> new_trajactory = generate_trajectory(22, waypoints, previous_path_x, previous_path_y);
-
-    vector<vector<double>> dummy_trajectory;
-    dummy_trajectory = generate_KL_trajectory(preds, previous_path_x, previous_path_y);
-
-//    if (this->status.v_yaw < 10 ){
-//        dummy_trajectory = generate_KL_trajectory(preds, previous_path_x, previous_path_y);
-//    } else{
-//        dummy_trajectory = generate_LCL_trajectory(preds, previous_path_x, previous_path_y);
-//    }
-
+    this->status.state = next_state;
 
     return next_trajectory;
 }
@@ -269,7 +252,6 @@ vector<double> Vehicle::get_kinematics(const map<int, Vehicle> &preds, int lane_
     if (get_vehicle_ahead(preds, lane_id, car_ahead)){
         double dist = car_ahead.status.s - this->status.s;
 //        cout << "[get_kinematics] found car ahead, dist = " << dist << ", v = " << car_ahead.status.v_yaw << endl;
-
         if (dist < 50 && dist > 25){
             v_target = car_ahead.status.v_yaw;
 //            cout << "[get_kinematics] follow with v_target = " << v_target << endl;
@@ -284,7 +266,6 @@ vector<double> Vehicle::get_kinematics(const map<int, Vehicle> &preds, int lane_
         } else {
 //            cout << "[get_kinematics] free with v_target = " << v_target << endl;
         }
-
     } else {
 //        cout << "[get_kinematics] free with v_target = " << v_target << endl;
     }
@@ -351,6 +332,12 @@ vector<double> Vehicle::get_LCL_param(const map<int, Vehicle> &preds) {
         return {-1, -1, -1, -1};
     }
 
+    Vehicle left_vehicle;
+    if (this->get_vehicle_neighbor_lane(preds, this->get_lane_id() - 1, left_vehicle)){
+        cout << "[get_LCL_param] left side car detected" << endl;
+        return {-1, -1, -1, -1};
+    }
+
     double d_target = lane_id*MAP_LANE_WIDTH + 0.5*MAP_LANE_WIDTH;
     vector<double> kinematics = this->get_kinematics(preds, lane_id);
 
@@ -360,6 +347,12 @@ vector<double> Vehicle::get_LCL_param(const map<int, Vehicle> &preds) {
 vector<double> Vehicle::get_LCR_param(const map<int, Vehicle> &preds) {
     int lane_id = this->get_lane_id() + 1;
     if (lane_id > 2){
+        return {-1, -1, -1, -1};
+    }
+
+    Vehicle right_vehicle;
+    if (this->get_vehicle_neighbor_lane(preds, this->get_lane_id() + 1, right_vehicle)){
+        cout << "right side car detected" << endl;
         return {-1, -1, -1, -1};
     }
 
@@ -406,6 +399,30 @@ bool Vehicle::get_vehicle_ahead(const map<int, Vehicle> &preds, int lane, Vehicl
     return found_vehicle;
 }
 
+bool Vehicle::get_vehicle_neighbor_lane(const map<int, Vehicle> &preds, int neighbor_lane_id, Vehicle &r_vehicle) {
+
+    bool found_vehicle = false;
+    double min_distance = std::numeric_limits<double>::infinity();
+    Vehicle temp_vehicle;
+
+    for (auto vehicle : preds){
+        // distance between leading vehicle at the time of beginning of new planning
+        // cout << "other car, id, s, d = "<<vehicle.first<<", "<<vehicle.second.status.s<<", "<<vehicle.second.status.d<<endl;
+        double dist = vehicle.second.status.s - this->status.s;
+        bool has_vehicle_aside = fabs(dist) < 3;
+        if (vehicle.second.get_lane_id() == neighbor_lane_id && has_vehicle_aside ){
+            if ( dist < min_distance ){
+                min_distance = dist;
+                r_vehicle = vehicle.second;
+                found_vehicle = true;
+            }
+        }
+    }
+
+    return found_vehicle;
+}
+
+
 int Vehicle::get_lane_id() {
     // get lane id from d
     // id definition
@@ -422,6 +439,7 @@ int Vehicle::get_lane_id() {
 }
 
 map<int, Vehicle> Vehicle::predict_other_vehicles(const vector<vector<double>> &sensor_fusion, double duration) {
+    // predict other car's position, e.g. at time of previous end path
     map<int, Vehicle> preds;
 
     for (auto vehicle_data : sensor_fusion){
@@ -442,6 +460,8 @@ map<int, Vehicle> Vehicle::predict_other_vehicles(const vector<vector<double>> &
 
     return preds;
 }
+
+
 
 
 
