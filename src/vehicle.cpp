@@ -383,53 +383,6 @@ vector<vector<double>> Vehicle::get_waypoint(vector<double> param) {
     return waypoints;
 }
 
-vector<vector<double>>
-Vehicle::generate_LCL_trajectory(const map<int, Vehicle> &preds, vector<double> previous_path_x,
-                                 vector<double> previous_path_y) {
-    int lane_id = this->get_lane_id() - 1;
-    lane_id = max(lane_id, 0);
-    double d_target = lane_id*MAP_LANE_WIDTH + 0.5*MAP_LANE_WIDTH;
-
-    vector<double> kinematics = this->get_kinematics(preds, lane_id);
-    this->status.v_yaw_desired = kinematics[1];
-    double s_delta = kinematics[0]/3;
-
-
-    vector<double> wp0 = {this->status.s + 30, d_target}; // suppose 30m spline interpolation is limited by lateral acceleration
-    vector<double> wp1 = {this->status.s + 30 + s_delta, d_target};
-    vector<double> wp2 = {this->status.s + 30 + 2*s_delta, d_target};
-
-    vector<vector<double>> waypoints = {wp0, wp1, wp2};
-    cout << "[generate_LCL_trajectory] ego car.v_yaw_desired = " << this->status.v_yaw_desired << endl;
-
-    vector<vector<double>> new_trajactory = generate_trajectory(this->status.v_yaw_desired, waypoints, previous_path_x, previous_path_y);
-
-    return new_trajactory;
-}
-
-vector<vector<double>>
-Vehicle::generate_LCR_trajectory(const map<int, Vehicle> &preds, vector<double> previous_path_x,
-                                                       vector<double> previous_path_y) {
-    int lane_id = this->get_lane_id() + 1;
-    lane_id = min(lane_id, LANES_NUMBER-1);
-    double d_target = lane_id*MAP_LANE_WIDTH + 0.5*MAP_LANE_WIDTH;
-
-    vector<double> kinematics = this->get_kinematics(preds, lane_id);
-    this->status.v_yaw_desired = kinematics[1];
-    double s_delta = kinematics[0]/3;
-
-    vector<double> wp0 = {this->status.s + 30, d_target}; // suppose 30m spline interpolation is limited by lateral acceleration
-    vector<double> wp1 = {this->status.s + 30 + s_delta, d_target};
-    vector<double> wp2 = {this->status.s + 30 + 2*s_delta, d_target};
-
-    vector<vector<double>> waypoints = {wp0, wp1, wp2};
-    cout << "[generate_LCR_waypoints] ego car.v_yaw_desired = " << this->status.v_yaw_desired << endl;
-
-    vector<vector<double>> new_trajactory = generate_trajectory(this->status.v_yaw_desired, waypoints, previous_path_x, previous_path_y);
-
-    return new_trajactory;
-}
-
 bool Vehicle::get_vehicle_ahead(const map<int, Vehicle> &preds, int lane, Vehicle &r_vehicle) {
     bool found_vehicle = false;
     double min_distance = std::numeric_limits<double>::infinity();
