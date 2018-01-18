@@ -93,6 +93,19 @@ int main() {
                     vector<vector<double>> next_path = ego_car.update(ego_car_data, sensor_fusion,
                                                                       previous_path_x, previous_path_y,
                                                                       end_path_s, end_path_d);
+
+                    // todo:
+                    // 1. fix lag, delta t
+                    // 2. cost function,
+                    // optimal_speed,
+                    // center_lane_bonus,
+                    // lane_change_penaltiy,
+                    // double_lane_change_penaltiy
+                    // 3. PLCL / PLCR
+                    // 4. magic number s = 30, maybe cause collision
+                    // 5. need emergency break
+                    // 6. map waypoint interpolation
+
                     /***** end, my codes *****/
                     json msgJson;
 
