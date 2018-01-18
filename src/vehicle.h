@@ -37,10 +37,11 @@ public:
     vector<double> get_kinematics(const map<int, Vehicle> &preds, int lane_id);
 
     // cost functions
-    double cal_total_cost(vector<double> param);
+    double cal_total_cost(const vector<double>& param, const vector<vector<double>>& traj, const vector<vector<double>>& sensor_fusion);
     double cal_cost_not_in_center_lane(double d_target);
     double cal_cost_best_target_speed(double v_target);
     double cal_cost_lane_change(int curr_lane_id, int target_lane_id);
+    double cal_cost_accumulated_d(const vector<vector<double>> &traj);
     double cal_cost_collision();
 
     // helper functions

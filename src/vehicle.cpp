@@ -54,7 +54,7 @@ Vehicle::update(vector<double> ego_car_data, vector<vector<double>> sensor_fusio
     vector<double> next_param; // s_target, d_target, v_feasible, v_target
     vector<vector<double>> next_wps;
     vector<vector<double>> next_traj;
-    double min_cost = 9999;
+    double min_cost = 99999;
 
     for (auto state : next_states){
         vector<double> candidates_param;
@@ -63,14 +63,10 @@ Vehicle::update(vector<double> ego_car_data, vector<vector<double>> sensor_fusio
 
         if (state == "KL"){
             candidates_param = get_KL_param(preds);
+            candidate_wps = get_waypoint(candidates_param);
+            candidate_traj = generate_trajectory(candidates_param[2], candidate_wps, previous_path_x, previous_path_y);
 
-            cout << "[update] KL, s_target, d_target, v_feasible, v_target = ";
-            for(auto each : candidates_param){
-                cout << each << ", ";
-            }
-            cout << endl;
-
-            double cost = cal_total_cost(candidates_param);
+            double cost = cal_total_cost(candidates_param, candidate_traj, sensor_fusion);
             cout << "[update] KL, total_cost = " << cost << endl;
             if (cost < min_cost){
                 min_cost = cost;
@@ -78,14 +74,10 @@ Vehicle::update(vector<double> ego_car_data, vector<vector<double>> sensor_fusio
                 next_state = "KL";
             }
 
-//            if (candidates_param[3] > v_best){
-//                v_best = candidates_param[3];
-//                next_param = candidates_param;
-//                next_state = "KL";
-//            }
-
         }else if (state == "LCL"){
             candidates_param = get_LCL_param(preds);
+            candidate_wps = get_waypoint(candidates_param);
+            candidate_traj = generate_trajectory(candidates_param[2], candidate_wps, previous_path_x, previous_path_y);
 
             cout << "[update] LCL, s_target, d_target, v_feasible, v_target = ";
             for(auto each : candidates_param){
@@ -93,7 +85,7 @@ Vehicle::update(vector<double> ego_car_data, vector<vector<double>> sensor_fusio
             }
             cout << endl;
 
-            double cost = cal_total_cost(candidates_param);
+            double cost = cal_total_cost(candidates_param, candidate_traj, sensor_fusion);
             cout << "[update] LCL, total_cost = " << cost << endl;
             if (cost < min_cost){
                 min_cost = cost;
@@ -101,22 +93,17 @@ Vehicle::update(vector<double> ego_car_data, vector<vector<double>> sensor_fusio
                 next_state = "LCL";
             }
 
-//            if (candidates_param[3] > v_best){
-//                v_best = candidates_param[3];
-//                next_param = candidates_param;
-//                next_state = "LCL";
-//            }
-
         }else if (state =="LCR"){
             candidates_param = get_LCR_param(preds);
-
+            candidate_wps = get_waypoint(candidates_param);
+            candidate_traj = generate_trajectory(candidates_param[2], candidate_wps, previous_path_x, previous_path_y);
             cout << "[update] LCR, s_target, d_target, v_feasible, v_target = ";
             for(auto each : candidates_param){
                 cout << each << ", ";
             }
             cout << endl;
 
-            double cost = cal_total_cost(candidates_param);
+            double cost = cal_total_cost(candidates_param, candidate_traj, sensor_fusion);
             cout << "[update] LCR, total_cost = " << cost << endl;
             if (cost < min_cost){
                 min_cost = cost;
@@ -124,11 +111,6 @@ Vehicle::update(vector<double> ego_car_data, vector<vector<double>> sensor_fusio
                 next_state = "LCR";
             }
 
-//            if (candidates_param[3] > v_best){
-//                v_best = candidates_param[3];
-//                next_param = candidates_param;
-//                next_state = "LCR";
-//            }
         }
     }
     cout << "[update] next_state, s_target, d_target, v_feasible, v_target = " << next_state << ", ";
@@ -164,6 +146,9 @@ vector<string> Vehicle::get_successor_states() {
 vector<vector<double>>
 Vehicle::generate_trajectory(double v_desired, vector<vector<double>> waypoints,
                              vector<double> previous_path_x, vector<double> previous_path_y) {
+    if (v_desired < 0 || waypoints[0][0]<0 || waypoints[0][1]<0){
+        return {{-1}, {-1}};
+    }
     vector<double> ptsx;
     vector<double> ptsy;
 
@@ -376,6 +361,9 @@ vector<double> Vehicle::get_LCR_param(const map<int, Vehicle> &preds) {
 }
 
 vector<vector<double>> Vehicle::get_waypoint(vector<double> param) {
+    if (param[0]<0 || param[1]<0){
+        return {{-1,-1}};
+    }
     double s_delta = param[0]/3;
     double d_target = param[1];
 
@@ -481,18 +469,21 @@ double Vehicle::sigmoid(double x) {
     return 1.0/(1+exp(-x));
 }
 
-double Vehicle::cal_total_cost(vector<double> param) {
+double Vehicle::cal_total_cost(const vector<double>& param, const vector<vector<double>>& traj, const vector<vector<double>>& sensor_fusion) {
     if (param[0]<0 || param[1]<0 || param[2]<0 || param[3]<0){
-        return 2;
+        return 999;
     }
+    int target_lane_id = (int)floor(param[1]/(double)MAP_LANE_WIDTH);
+    int curr_lane_id = this->get_lane_id();
 
     double cost_first_center_lane = cal_cost_not_in_center_lane(param[1]);
     double cost_target_speed = cal_cost_best_target_speed(param[3]);
-    double cost_lane_change = cal_cost_lane_change(this->get_lane_id(), (int)floor(param[1]/(double)MAP_LANE_WIDTH));
+    double cost_lane_change = cal_cost_lane_change(curr_lane_id, target_lane_id);
+    double cost_long_lane_change = cal_cost_accumulated_d(traj);
 
     cout << "[total cost] in_middle_lane = "<<cost_first_center_lane<<", target_speed = "<<cost_target_speed<<", lane_change = "<<cost_lane_change<<endl;
 
-    double total_cost = 0.06 * cost_first_center_lane + 0.9 * cost_target_speed + 0.04 *cost_lane_change;
+    double total_cost = 0.06 * cost_first_center_lane + 0.9 * cost_target_speed + 0.04 *cost_lane_change + 0.6*cost_long_lane_change;
 
     return total_cost;
 }
@@ -541,6 +532,12 @@ double Vehicle::cal_cost_lane_change(int curr_lane_id, int target_lane_id) {
 }
 
 double Vehicle::cal_cost_collision() {
+    return 0;
+}
+
+double Vehicle::cal_cost_accumulated_d(const vector<vector<double>> &traj) {
+    // cost = [0, 1], 0 -> best, 1-> worst
+
     return 0;
 }
 
