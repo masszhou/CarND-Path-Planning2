@@ -11,7 +11,7 @@
 
 Vehicle::Vehicle() {
     this->status.state = "KL";
-    this->status.v_yaw_desired = 5;
+    this->status.v_yaw_desired = 2;
 }
 
 void Vehicle::load_map_info(const string &file_path) {
@@ -35,6 +35,8 @@ Vehicle::update(vector<double> ego_car_data, vector<vector<double>> sensor_fusio
         this->status.s = end_path_s;
         this->status.d = end_path_d;
     }
+
+    cout << "[update] previous_path_x.size() = "<<previous_path_x.size()<<endl;
 
     // predict other cars at time of previous end path
     double duration = (double)previous_path_x.size() * (double)SIM_DT;
