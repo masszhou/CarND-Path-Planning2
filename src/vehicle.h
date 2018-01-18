@@ -23,22 +23,27 @@ public:
                                   vector<double> previous_path_x, vector<double> previous_path_y,
                                   double end_path_s, double end_path_d);
 
-    vector<string> successor_states();
+    vector<string> get_successor_states();
 
+    // trajectory generation
     vector<vector<double>> generate_trajectory(double v_desired, vector<vector<double>> waypoints,
                                                    vector<double> previous_path_x, vector<double> previous_path_y);
-
-    vector<vector<double>>
-    generate_KL_trajectory(const map<int, Vehicle>& preds, vector<double> previous_path_x, vector<double> previous_path_y);
-
     vector<vector<double>> get_waypoint(vector<double> param);
 
+    // FSM
     vector<double> get_KL_param(const map<int, Vehicle>& preds);
     vector<double> get_LCL_param(const map<int, Vehicle>& preds);
     vector<double> get_LCR_param(const map<int, Vehicle>& preds);
-
     vector<double> get_kinematics(const map<int, Vehicle> &preds, int lane_id);
 
+    // cost functions
+    double cal_total_cost(vector<double> param);
+    double cal_cost_not_in_center_lane(double d_target);
+    double cal_cost_best_target_speed(double v_target);
+    double cal_cost_lane_change(int curr_lane_id, int target_lane_id);
+    double cal_cost_collision();
+
+    // helper functions
     map<int, Vehicle> predict_other_vehicles(const vector<vector<double>> &sensor_fusion, double duration);
     bool get_vehicle_ahead(const map<int, Vehicle> &preds, int lane, Vehicle &r_vehicle);
     bool get_vehicle_neighbor_lane(const map<int, Vehicle> &preds, int neighbor_lane_id, Vehicle &r_vehicle);
@@ -48,6 +53,7 @@ public:
     double deg2rad(double x) { return x * M_PI / 180; }
     double mph2ms(double v_mph){return v_mph/2.24; }
     double ms2mph(double v_ms){return v_ms*2.24; }
+    double sigmoid(double x);
 
     Map map_info;
     CarStatus status;

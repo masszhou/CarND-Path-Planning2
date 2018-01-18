@@ -7,7 +7,7 @@ add_definitions(-std=c++11)
 set(CXX_FLAGS "-Wall")
 set(CMAKE_CXX_FLAGS, "${CXX_FLAGS}")
 
-set(sources src/main.cpp src/map.cpp src/map.h src/vehicle.cpp src/vehicle.h src/structure.h src/constants.h)
+set(sources src/main.cpp src/map.cpp src/vehicle.cpp)
 
 # here I upload uWS with project files
 include_directories(${PROJECT_SOURCE_DIR}/3rd-party/include)

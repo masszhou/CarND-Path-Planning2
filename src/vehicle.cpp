@@ -46,62 +46,92 @@ Vehicle::update(vector<double> ego_car_data, vector<vector<double>> sensor_fusio
     map<int, Vehicle> preds = predict_other_vehicles(sensor_fusion, duration);
 
     // evaluate next feasible state and trajectory
-    vector<string> next_states = this->successor_states();
+    vector<string> next_states = this->get_successor_states();
     vector<vector<double>> next_trajectory;
 
     double v_best = 0;
     string next_state;
-    vector<double> next_param;
+    vector<double> next_param; // s_target, d_target, v_feasible, v_target
     vector<vector<double>> next_wps;
     vector<vector<double>> next_traj;
+    double min_cost = 9999;
 
     for (auto state : next_states){
         vector<double> candidates_param;
+        vector<vector<double>> candidate_wps;
+        vector<vector<double>> candidate_traj;
 
         if (state == "KL"){
             candidates_param = get_KL_param(preds);
-            cout << "[update] KL, feasible s, d, v_feasible, v_target = ";
+
+            cout << "[update] KL, s_target, d_target, v_feasible, v_target = ";
             for(auto each : candidates_param){
                 cout << each << ", ";
             }
             cout << endl;
 
-            if (candidates_param[3] > v_best){
-                v_best = candidates_param[3];
+            double cost = cal_total_cost(candidates_param);
+            cout << "[update] KL, total_cost = " << cost << endl;
+            if (cost < min_cost){
+                min_cost = cost;
                 next_param = candidates_param;
                 next_state = "KL";
             }
 
+//            if (candidates_param[3] > v_best){
+//                v_best = candidates_param[3];
+//                next_param = candidates_param;
+//                next_state = "KL";
+//            }
+
         }else if (state == "LCL"){
             candidates_param = get_LCL_param(preds);
-            cout << "[update] LCL, feasible s, d, v_feasible, v_target = ";
+
+            cout << "[update] LCL, s_target, d_target, v_feasible, v_target = ";
             for(auto each : candidates_param){
                 cout << each << ", ";
             }
             cout << endl;
 
-            if (candidates_param[3] > v_best){
-                v_best = candidates_param[3];
+            double cost = cal_total_cost(candidates_param);
+            cout << "[update] LCL, total_cost = " << cost << endl;
+            if (cost < min_cost){
+                min_cost = cost;
                 next_param = candidates_param;
                 next_state = "LCL";
             }
 
+//            if (candidates_param[3] > v_best){
+//                v_best = candidates_param[3];
+//                next_param = candidates_param;
+//                next_state = "LCL";
+//            }
+
         }else if (state =="LCR"){
             candidates_param = get_LCR_param(preds);
-            cout << "[update] LCR, feasible s, d, v_feasible, v_target = ";
+
+            cout << "[update] LCR, s_target, d_target, v_feasible, v_target = ";
             for(auto each : candidates_param){
                 cout << each << ", ";
             }
             cout << endl;
 
-            if (candidates_param[3] > v_best){
-                v_best = candidates_param[3];
+            double cost = cal_total_cost(candidates_param);
+            cout << "[update] LCR, total_cost = " << cost << endl;
+            if (cost < min_cost){
+                min_cost = cost;
                 next_param = candidates_param;
                 next_state = "LCR";
             }
+
+//            if (candidates_param[3] > v_best){
+//                v_best = candidates_param[3];
+//                next_param = candidates_param;
+//                next_state = "LCR";
+//            }
         }
     }
-    cout << "[update] next_state, s, d, v_desired, v_target = " << next_state << ", ";
+    cout << "[update] next_state, s_target, d_target, v_feasible, v_target = " << next_state << ", ";
     for (auto each : next_param){
         cout << each << ", ";
     }
@@ -116,7 +146,7 @@ Vehicle::update(vector<double> ego_car_data, vector<vector<double>> sensor_fusio
     return next_trajectory;
 }
 
-vector<string> Vehicle::successor_states() {
+vector<string> Vehicle::get_successor_states() {
     vector<string> states;
     states.push_back("KL");
     string state = this->status.state;
@@ -297,30 +327,6 @@ vector<double> Vehicle::get_kinematics(const map<int, Vehicle> &preds, int lane_
     return {dist_feasible, v_feasible, v_target};
 }
 
-vector<vector<double>>
-Vehicle::generate_KL_trajectory(const map<int, Vehicle>& preds, vector<double> previous_path_x, vector<double> previous_path_y) {
-
-    int lane_id = this->get_lane_id();
-    lane_id = max(lane_id, 0);
-    double d_target = lane_id*MAP_LANE_WIDTH + 0.5*MAP_LANE_WIDTH;
-
-    vector<double> kinematics = this->get_kinematics(preds, this->get_lane_id());
-    this->status.v_yaw_desired = kinematics[1];
-    double s_delta = kinematics[0]/3;
-//    cout << "[generate_KL_trajectory] s_delta = " << s_delta << endl;
-    //---- drive in straight
-    vector<double> wp0 = {this->status.s + 30, d_target};
-    vector<double> wp1 = {this->status.s + 30 + s_delta, d_target};
-    vector<double> wp2 = {this->status.s + 30 + 2*s_delta, d_target};
-
-    vector<vector<double>> waypoints = {wp0, wp1, wp2};
-//    cout << "[generate_KL_trajectory] ego car.v_yaw_desired = " << this->status.v_yaw_desired << endl;
-
-    vector<vector<double>> new_trajactory = generate_trajectory(this->status.v_yaw_desired, waypoints, previous_path_x, previous_path_y);
-
-    return new_trajactory;
-}
-
 
 vector<double> Vehicle::get_KL_param(const map<int, Vehicle> &preds) {
     int lane_id = this->get_lane_id();
@@ -466,6 +472,76 @@ map<int, Vehicle> Vehicle::predict_other_vehicles(const vector<vector<double>> &
     }
 
     return preds;
+}
+
+double Vehicle::sigmoid(double x) {
+    // x = (-inf, inf)
+    // y = (0, 1)
+    // x = 0, y = 0.5
+    return 1.0/(1+exp(-x));
+}
+
+double Vehicle::cal_total_cost(vector<double> param) {
+    if (param[0]<0 || param[1]<0 || param[2]<0 || param[3]<0){
+        return 2;
+    }
+
+    double cost_first_center_lane = cal_cost_not_in_center_lane(param[1]);
+    double cost_target_speed = cal_cost_best_target_speed(param[3]);
+    double cost_lane_change = cal_cost_lane_change(this->get_lane_id(), (int)floor(param[1]/(double)MAP_LANE_WIDTH));
+
+    cout << "[total cost] in_middle_lane = "<<cost_first_center_lane<<", target_speed = "<<cost_target_speed<<", lane_change = "<<cost_lane_change<<endl;
+
+    double total_cost = 0.06 * cost_first_center_lane + 0.9 * cost_target_speed + 0.04 *cost_lane_change;
+
+    return total_cost;
+}
+
+double Vehicle::cal_cost_not_in_center_lane(double d_target) {
+    // cost = [0, 1], 0 -> best, 1-> worst
+    int lane_id = (int)floor(d_target/(double)MAP_LANE_WIDTH);
+
+    if (lane_id == 1){
+        return 0;
+    }else{
+        return 1;
+    }
+}
+
+double Vehicle::cal_cost_best_target_speed(double v_target) {
+    // cost = [0, 1], 0 -> best, 1-> worst
+    // v_target -> MAX_SPEED, cost -> 0
+    // v_target -> 0, cost -> 1;
+//    // cost function from lecture
+//    if (v < (SPEED_LIMIT - SPEED_LIMIT_BUFFER)){
+//        cost = -1/(double)(SPEED_LIMIT - SPEED_LIMIT_BUFFER) * v + 1;
+//    } else if (v<=SPEED_LIMIT && v>(SPEED_LIMIT - SPEED_LIMIT_BUFFER)){
+//        cost = 1/(double)SPEED_LIMIT_BUFFER * v - (double)(SPEED_LIMIT-SPEED_LIMIT_BUFFER)/(double)SPEED_LIMIT_BUFFER;
+//    } else {
+//        cost = 1;
+//    }
+    double cost;
+
+    if (v_target <= MAX_SPEED){
+        cost = 1 - 1/(double)MAX_SPEED * v_target;
+    }else{
+        cost = 1;
+    }
+
+    return cost;
+}
+
+double Vehicle::cal_cost_lane_change(int curr_lane_id, int target_lane_id) {
+    // cost = [0, 1], 0 -> best, 1-> worst
+    if (curr_lane_id == target_lane_id){
+        return 0;
+    }else{
+        return 1;
+    }
+}
+
+double Vehicle::cal_cost_collision() {
+    return 0;
 }
 
 

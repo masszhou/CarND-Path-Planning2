@@ -95,7 +95,6 @@ int main() {
                                                                       end_path_s, end_path_d);
 
                     // todo:
-                    // 1. fix lag, delta t
                     // 2. cost function,
                     // optimal_speed,
                     // center_lane_bonus,
