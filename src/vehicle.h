@@ -51,6 +51,7 @@ public:
 
     Map map_info;
     CarStatus status;
+    double new_planning_time;
 
 };
 

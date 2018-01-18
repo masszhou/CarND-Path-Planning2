@@ -36,7 +36,10 @@ Vehicle::update(vector<double> ego_car_data, vector<vector<double>> sensor_fusio
         this->status.d = end_path_d;
     }
 
-    cout << "[update] previous_path_x.size() = "<<previous_path_x.size()<<endl;
+    this->new_planning_time = ((double)TRAJECTORY_SIZE - previous_path_x.size()) * (double)SIM_DT;
+
+    cout << "[update] previous_path_x.size() = "<<previous_path_x.size();
+    cout << ", new_planning_time = "<<this->new_planning_time<<endl;
 
     // predict other cars at time of previous end path
     double duration = (double)previous_path_x.size() * (double)SIM_DT;
@@ -217,7 +220,7 @@ Vehicle::generate_trajectory(double v_desired, vector<vector<double>> waypoints,
     double target_dist = sqrt((target_x) * (target_x) + (target_y) * (target_y));
     double x_add_on = 0;
     // d = N * 0.02 * velocity, 0.02 is dt to next waypoints
-    for (int i = 1; i <= 50 - previous_path_x.size(); i++) {
+    for (int i = 1; i <= TRAJECTORY_SIZE - previous_path_x.size(); i++) {
         double N = (target_dist / (.02 * v_desired)); // ref_vel/2.24 = ref_vel*0.447, mph to m/s
         double x_point = x_add_on + (target_x) / N;
         double y_point = s(x_point);
@@ -281,7 +284,9 @@ vector<double> Vehicle::get_kinematics(const map<int, Vehicle> &preds, int lane_
     // ref_v -= 0.224 means jerk=5[m/s/s], dt= 0.02[s]
     // 0.02[s] * a = 0.224[mph] -> 0.02[s] * a = 0.1[m/s] -> a = 5[m/s/s]
     if (this->status.v_yaw < v_target) {
-        v_feasible += MAX_JERK * SIM_DT;  // accelate with max allowed acceleration due to max_jerk
+        // accelate with max allowed acceleration due to max_jerk
+        // use 1xdt is a lower bound of limited acceleration
+        v_feasible += MAX_JERK * SIM_DT;
         v_feasible = min(v_feasible, (double)MAX_SPEED);
     } else if (this->status.v_yaw > v_target) {
         v_feasible -= MAX_JERK * SIM_DT;

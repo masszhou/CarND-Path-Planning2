@@ -18,4 +18,6 @@
 #define MAX_JERK 10 // [m/s/s/s], due to project specification
 #define MAX_ACCEL 10 // [m/s]
 
+#define TRAJECTORY_SIZE 50 // 50 points
+
 #endif //PATH_PLANNING_CONSTANTS_H
