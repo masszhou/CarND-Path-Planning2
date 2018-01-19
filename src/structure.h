@@ -25,4 +25,15 @@ struct CarStatus{
     string state;
 };
 
+struct Trajectory{
+    vector<double> x_vec;
+    vector<double> y_vec;
+    vector<double> s_vec;
+    vector<double> d_vec;
+    double s_target;
+    double d_target;
+    double v_feasible; // yaw direction
+    double v_target;
+};
+
 #endif //PATH_PLANNING_STRUCTURE_H

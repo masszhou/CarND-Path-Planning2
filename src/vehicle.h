@@ -26,6 +26,11 @@ public:
     vector<string> get_successor_states();
 
     // trajectory generation
+    Trajectory generate_state_traj(const string &state,
+                                   const map<int, Vehicle> &preds,
+                                   const vector<double> &previous_path_x,
+                                   const vector<double> &previous_path_y);
+
     vector<vector<double>> generate_trajectory(double v_desired, vector<vector<double>> waypoints,
                                                    vector<double> previous_path_x, vector<double> previous_path_y);
     vector<vector<double>> get_waypoint(vector<double> param);
@@ -37,7 +42,7 @@ public:
     vector<double> get_kinematics(const map<int, Vehicle> &preds, int lane_id);
 
     // cost functions
-    double cal_total_cost(const vector<double>& param, const vector<vector<double>>& traj, const vector<vector<double>>& sensor_fusion);
+    double cal_total_cost(const Trajectory& traj, const vector<vector<double>>& sensor_fusion);
     double cal_cost_not_in_center_lane(double d_target);
     double cal_cost_best_target_speed(double v_target);
     double cal_cost_lane_change(int curr_lane_id, int target_lane_id);
