@@ -37,17 +37,20 @@ public:
 
     // FSM
     vector<double> get_KL_param(const map<int, Vehicle>& preds);
+    vector<double> get_PLCL_param(const map<int, Vehicle>& preds);
+    vector<double> get_PLCR_param(const map<int, Vehicle>& preds);
     vector<double> get_LCL_param(const map<int, Vehicle>& preds);
     vector<double> get_LCR_param(const map<int, Vehicle>& preds);
     vector<double> get_kinematics(const map<int, Vehicle> &preds, int lane_id);
 
     // cost functions
-    double cal_total_cost(const Trajectory& traj, const vector<vector<double>>& sensor_fusion);
+    double cal_total_cost(const Trajectory& traj, const map<int, Vehicle>& preds, const vector<vector<double>>& sensor_fusion);
     double cal_cost_not_in_center_lane(double d_target);
     double cal_cost_best_target_speed(double v_target);
     double cal_cost_lane_change(int curr_lane_id, int target_lane_id);
     double cal_cost_accumulated_d(const vector<vector<double>> &traj);
-    double cal_cost_collision();
+    double cal_cost_collision(int curr_lane_id, int target_lane_id, const map<int, Vehicle>& preds);
+    double cal_cost_cross_two_lane(int lane_id_curr, double d_curr, int lane_id_target, double d_target);
 
     // helper functions
     map<int, Vehicle> predict_other_vehicles(const vector<vector<double>> &sensor_fusion, double duration);

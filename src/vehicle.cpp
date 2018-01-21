@@ -38,8 +38,9 @@ Vehicle::update(vector<double> ego_car_data, vector<vector<double>> sensor_fusio
 
     this->new_planning_time = ((double)TRAJECTORY_SIZE - previous_path_x.size()) * (double)SIM_DT;
 
-    cout << "[update] previous_path_x.size() = "<<previous_path_x.size();
-    cout << ", new_planning_time = "<<this->new_planning_time<<endl;
+    cout << "[update] current state = " << this->status.state << endl;
+//    cout << "[update] previous_path_x.size() = "<<previous_path_x.size();
+//    cout << ", new_planning_time = "<<this->new_planning_time<<endl;
 
     // predict other cars at time of previous end path
     double duration = (double)previous_path_x.size() * (double)SIM_DT;
@@ -55,10 +56,14 @@ Vehicle::update(vector<double> ego_car_data, vector<vector<double>> sensor_fusio
     for (auto each_state: next_states){
         Trajectory candidate_traj;
         candidate_traj = generate_state_traj(each_state, preds, previous_path_x, previous_path_y);
-        cout << "[update] "<<each_state<<", s_target, d_target, v_feasible, v_target = ";
-        cout <<candidate_traj.s_target<<", "<<candidate_traj.d_target<<", "<<candidate_traj.v_feasible<<", "<<candidate_traj.v_target<<endl;
+//        cout << "[update] "<<each_state<<", s_target, d_target, v_feasible, v_target = ";
+//        cout <<candidate_traj.s_target<<", "<<candidate_traj.d_target<<", "<<candidate_traj.v_feasible<<", "<<candidate_traj.v_target<<endl;
 
-        double cost = cal_total_cost(candidate_traj, sensor_fusion);
+
+        double cost = cal_total_cost(candidate_traj, preds, sensor_fusion);
+        cout << "[update] "<<each_state<<", v_feasible, v_target = "<<candidate_traj.v_feasible<<", "<<candidate_traj.v_target;
+        cout << ", cost = "<< cost << endl;
+
         if (cost < min_cost){
             min_cost = cost;
             next_traj = candidate_traj;
@@ -69,6 +74,7 @@ Vehicle::update(vector<double> ego_car_data, vector<vector<double>> sensor_fusio
     // update new state
     this->status.v_yaw_desired = next_traj.v_feasible;
     this->status.state = next_state;
+    cout << "[update] next state = " << this->status.state << endl;
 
     vector<vector<double>> next_trajectory = {next_traj.x_vec, next_traj.y_vec};
     return next_trajectory;
@@ -156,6 +162,20 @@ Trajectory Vehicle::generate_state_traj(const string& state, const map<int, Vehi
         param = get_KL_param(preds);
     }
 
+//    if (state == "KL"){
+//        param = get_KL_param(preds);
+//    } else if (state == "LCL") {
+//        param = get_LCL_param(preds);
+//    } else if (state == "LCR") {
+//        param = get_LCR_param(preds);
+//    } else if (state == "PLCL"){
+//        param = get_PLCL_param(preds);
+//    } else if (state == "PLCR"){
+//        param = get_PLCR_param(preds);
+//    } else {
+//        param = get_KL_param(preds);
+//    }
+
     wps = get_waypoint(param);
     traj = generate_trajectory(param[2], wps, previous_path_x, previous_path_y);
 
@@ -163,6 +183,8 @@ Trajectory Vehicle::generate_state_traj(const string& state, const map<int, Vehi
     traj_state.d_target = param[1];
     traj_state.v_feasible = param[2];
     traj_state.v_target = param[3];
+    traj_state.v_intended = param[4];
+
     traj_state.x_vec = traj[0];
     traj_state.y_vec = traj[1];
 
@@ -296,16 +318,16 @@ vector<double> Vehicle::get_kinematics(const map<int, Vehicle> &preds, int lane_
     Vehicle car_ahead;
     double v_target = MAX_SPEED;
     if (get_vehicle_ahead(preds, lane_id, car_ahead)){
-        double dist = car_ahead.status.s - this->status.s;
-//        cout << "[get_kinematics] found car ahead, dist = " << dist << ", v = " << car_ahead.status.v_yaw << endl;
-        if (dist < 50 && dist > 25){
+        dist_feasible = car_ahead.status.s - this->status.s;
+//        cout << "[get_kinematics] found car ahead, dist = " << dist_feasible << ", v = " << car_ahead.status.v_yaw << endl;
+        if (dist_feasible < CRUISE_FOLLOW_DIST && dist_feasible > TOO_CLOSE_WARNING_DIST){
             v_target = car_ahead.status.v_yaw;
 //            cout << "[get_kinematics] follow with v_target = " << v_target << endl;
-        } else if (dist < 25 && dist > 10){
+        } else if (dist_feasible < TOO_CLOSE_WARNING_DIST && dist_feasible > FORWARD_COLLISION_WARNING_DIST){
             // lower speed to avoid crash
             v_target = car_ahead.status.v_yaw -1; // [m/s]
 //            cout << "[get_kinematics] slow down and follow with v_target = "<< v_target << endl;
-        } else if (dist < 10){
+        } else if (dist_feasible < FORWARD_COLLISION_WARNING_DIST){
             v_target = car_ahead.status.v_yaw -2;
             this->status.v_yaw_desired -= 5 * 0.02;
 //            cout << "[get_kinematics] break with v_target = " << v_target << endl;
@@ -347,8 +369,49 @@ vector<double> Vehicle::get_KL_param(const map<int, Vehicle> &preds) {
     double d_target = lane_id*MAP_LANE_WIDTH + 0.5*MAP_LANE_WIDTH;
     vector<double> kinematics = this->get_kinematics(preds, lane_id);
 
-    return {kinematics[0], d_target, kinematics[1], kinematics[2]};
+    // v_target = v_intended
+    // {s_feasible, d_feasible, v_feasible, v_target, v_intended}
+    return {kinematics[0], d_target, kinematics[1], kinematics[2], kinematics[2]};
 }
+
+vector<double> Vehicle::get_PLCL_param(const map<int, Vehicle> &preds) {
+    cout << "[get_PLCL_param]----begin" << endl;
+    int lane_id_next = this->get_lane_id() - 1;
+    if (lane_id_next < 0){
+        return {-1, -1, -1, -1};
+    }
+
+    int lane_id = this->get_lane_id();
+    lane_id = max(lane_id, 0); // larger than 0
+    lane_id = min(lane_id, 2); // smaller then 2
+
+    double d_target = lane_id*MAP_LANE_WIDTH + 0.5*MAP_LANE_WIDTH;
+    vector<double> kinematics = this->get_kinematics(preds, lane_id);
+
+    // v_target = v_intended
+    // {s_feasible, d_feasible, v_feasible, v_target, v_intended}
+    return {kinematics[0], d_target, kinematics[1], kinematics[2], kinematics[2]};
+}
+
+vector<double> Vehicle::get_PLCR_param(const map<int, Vehicle> &preds) {
+    cout << "[get_PLCR_param]----begin" << endl;
+    int lane_id_next = this->get_lane_id() + 1;
+    if (lane_id_next > 2){
+        return {-1, -1, -1, -1};
+    }
+
+    int lane_id = this->get_lane_id();
+    lane_id = max(lane_id, 0); // larger than 0
+    lane_id = min(lane_id, 2); // smaller then 2
+
+    double d_target = lane_id*MAP_LANE_WIDTH + 0.5*MAP_LANE_WIDTH;
+    vector<double> kinematics = this->get_kinematics(preds, lane_id);
+
+    // v_target = v_intended
+    // {s_feasible, d_feasible, v_feasible, v_target, v_intended}
+    return {kinematics[0], d_target, kinematics[1], kinematics[2], kinematics[2]};
+}
+
 
 vector<double> Vehicle::get_LCL_param(const map<int, Vehicle> &preds) {
     int lane_id = this->get_lane_id() - 1;
@@ -356,16 +419,10 @@ vector<double> Vehicle::get_LCL_param(const map<int, Vehicle> &preds) {
         return {-1, -1, -1, -1};
     }
 
-    Vehicle left_vehicle;
-    if (this->get_vehicle_neighbor_lane(preds, this->get_lane_id() - 1, left_vehicle)){
-        cout << "[get_LCL_param] left side car detected" << endl;
-        return {-1, -1, -1, -1};
-    }
-
     double d_target = lane_id*MAP_LANE_WIDTH + 0.5*MAP_LANE_WIDTH;
     vector<double> kinematics = this->get_kinematics(preds, lane_id);
 
-    return {kinematics[0], d_target, kinematics[1], kinematics[2]};
+    return {kinematics[0], d_target, kinematics[1], kinematics[2], kinematics[2]};
 }
 
 vector<double> Vehicle::get_LCR_param(const map<int, Vehicle> &preds) {
@@ -374,16 +431,10 @@ vector<double> Vehicle::get_LCR_param(const map<int, Vehicle> &preds) {
         return {-1, -1, -1, -1};
     }
 
-    Vehicle right_vehicle;
-    if (this->get_vehicle_neighbor_lane(preds, this->get_lane_id() + 1, right_vehicle)){
-        cout << "right side car detected" << endl;
-        return {-1, -1, -1, -1};
-    }
-
     double d_target = lane_id*MAP_LANE_WIDTH + 0.5*MAP_LANE_WIDTH;
     vector<double> kinematics = this->get_kinematics(preds, lane_id);
 
-    return {kinematics[0], d_target, kinematics[1], kinematics[2]};
+    return {kinematics[0], d_target, kinematics[1], kinematics[2], kinematics[2]};
 }
 
 vector<vector<double>> Vehicle::get_waypoint(vector<double> param) {
@@ -392,11 +443,12 @@ vector<vector<double>> Vehicle::get_waypoint(vector<double> param) {
     }
     double s_delta = param[0]/3;
     double d_target = param[1];
+    double d_curr = this->get_lane_id()*MAP_LANE_WIDTH + 0.5*MAP_LANE_WIDTH;
 
     //---- drive in straight
     vector<double> wp0 = {this->status.s + 30, d_target};
-    vector<double> wp1 = {this->status.s + 30 + s_delta, d_target};
-    vector<double> wp2 = {this->status.s + 30 + 2*s_delta, d_target};
+    vector<double> wp1 = {this->status.s + 60, d_target};
+    vector<double> wp2 = {this->status.s + 90, d_target};
 
     vector<vector<double>> waypoints = {wp0, wp1, wp2};
 
@@ -495,7 +547,7 @@ double Vehicle::sigmoid(double x) {
     return 1.0/(1+exp(-x));
 }
 
-double Vehicle::cal_total_cost(const Trajectory &traj, const vector<vector<double>> &sensor_fusion) {
+double Vehicle::cal_total_cost(const Trajectory &traj, const map<int, Vehicle>& preds, const vector<vector<double>> &sensor_fusion) {
     if (traj.s_target<0 || traj.d_target<0 || traj.v_feasible<0 || traj.v_target<0){
         return 999;
     }
@@ -505,11 +557,19 @@ double Vehicle::cal_total_cost(const Trajectory &traj, const vector<vector<doubl
     double cost_first_center_lane = cal_cost_not_in_center_lane(traj.d_target);
     double cost_target_speed = cal_cost_best_target_speed(traj.v_target);
     double cost_lane_change = cal_cost_lane_change(curr_lane_id, target_lane_id);
+    double cost_cross_two_lanes = cal_cost_cross_two_lane(curr_lane_id, this->status.d, target_lane_id,
+                                                             traj.d_target);
+    double cost_collision = cal_cost_collision(curr_lane_id, target_lane_id, preds);
 //    double cost_long_lane_change = cal_cost_accumulated_d(traj);
 
-    cout << "[total cost] in_middle_lane = "<<cost_first_center_lane<<", target_speed = "<<cost_target_speed<<", lane_change = "<<cost_lane_change<<endl;
+    cout << "[total cost] in_middle_lane = "<<cost_first_center_lane;
+    cout << ", target_speed = "<<cost_target_speed;
+    cout << ", lane_change = "<<cost_lane_change;
+    cout << ", collision = "<<cost_collision;
+    cout << endl;
 
-    double total_cost = 0.06 * cost_first_center_lane + 0.9 * cost_target_speed + 0.04 *cost_lane_change;
+    double total_cost = 0.06 * cost_first_center_lane + 0.9 * cost_target_speed + 0.04 *cost_lane_change
+                        + 10 * cost_collision + cost_cross_two_lanes;
 
     return total_cost;
 }
@@ -557,8 +617,23 @@ double Vehicle::cal_cost_lane_change(int curr_lane_id, int target_lane_id) {
     }
 }
 
-double Vehicle::cal_cost_collision() {
+double Vehicle::cal_cost_collision(int curr_lane_id, int target_lane_id, const map<int, Vehicle>& preds) {
+    if (curr_lane_id - target_lane_id == 1){
+        // LCL
+        Vehicle left_vehicle;
+        if (this->get_vehicle_neighbor_lane(preds, target_lane_id, left_vehicle)) {
+            cout << "[get_LCL_param] left side car detected" << endl;
+            return 1;
+        }
+    }else if (curr_lane_id - target_lane_id == -1){
+        Vehicle right_vehicle;
+        if (this->get_vehicle_neighbor_lane(preds, target_lane_id, right_vehicle)){
+            cout << "right side car detected" << endl;
+            return 1;
+        }
+    }
     return 0;
+
 }
 
 double Vehicle::cal_cost_accumulated_d(const vector<vector<double>> &traj) {
@@ -566,6 +641,16 @@ double Vehicle::cal_cost_accumulated_d(const vector<vector<double>> &traj) {
 
     return 0;
 }
+
+double Vehicle::cal_cost_cross_two_lane(int lane_id_curr, double d_curr, int lane_id_target, double d_target) {
+
+    if (fabs(d_curr-d_target)>(double)MAP_LANE_WIDTH){
+        return 1;
+    } else {
+        return 0;
+    }
+}
+
 
 
 

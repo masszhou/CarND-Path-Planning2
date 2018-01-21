@@ -18,6 +18,11 @@
 #define MAX_JERK 10 // [m/s/s/s], due to project specification
 #define MAX_ACCEL 10 // [m/s]
 
+// safety
+#define CRUISE_FOLLOW_DIST 50 //m
+#define TOO_CLOSE_WARNING_DIST 25 //m
+#define FORWARD_COLLISION_WARNING_DIST 10 // m
+
 #define TRAJECTORY_SIZE 50 // 50 points
 
 #endif //PATH_PLANNING_CONSTANTS_H

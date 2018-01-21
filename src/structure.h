@@ -34,6 +34,7 @@ struct Trajectory{
     double d_target;
     double v_feasible; // yaw direction
     double v_target;
+    double v_intended;
 };
 
 #endif //PATH_PLANNING_STRUCTURE_H
