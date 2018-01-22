@@ -30,11 +30,19 @@ Vehicle::update(vector<double> ego_car_data, vector<vector<double>> sensor_fusio
     this->status.yaw = ego_car_data[4];
     this->status.v_yaw = ego_car_data[5];
 
-    // new trajectory continue from end path
-    if (!previous_path_x.empty()){
-        this->status.s = end_path_s;
-        this->status.d = end_path_d;
+    if (!check_safety_of_prev_traj(sensor_fusion, previous_path_x, previous_path_y)){
+        // if prev path is not safe due to current sensor fusion results, reset path
+        previous_path_x.clear();
+        previous_path_y.clear();
+    }else{
+        // new trajectory continue from end path
+        if (!previous_path_x.empty()){
+            this->status.s = end_path_s;
+            this->status.d = end_path_d;
+        }
     }
+
+
 
     this->new_planning_time = ((double)TRAJECTORY_SIZE - previous_path_x.size()) * (double)SIM_DT;
 
@@ -719,6 +727,28 @@ double Vehicle::cal_cost_cross_two_lane(int lane_id_curr, double d_curr, int lan
     } else {
         return 0;
     }
+}
+
+bool Vehicle::check_safety_of_prev_traj(const vector<vector<double>> &sensor_fusion,
+                                        const vector<double> &previous_path_x,
+                                        const vector<double> &previous_path_y) {
+
+    for (size_t idx = 0; idx < previous_path_x.size(); idx++){
+        double ego_x = previous_path_x[idx];
+        double ego_y = previous_path_y[idx];
+
+        for (auto vehicle_data : sensor_fusion){
+            double other_x = vehicle_data[1];
+            double other_y = vehicle_data[2];
+            double dist = sqrt((ego_x-other_x)*(ego_x-other_x)+(ego_y-other_y)*(ego_y-other_y));
+            if (dist <= 1){
+                cout << "[check prev safety] warning, potential crash, reset path"<<endl;
+                return false;
+            }
+        }
+    }
+
+    return true;
 }
 
 

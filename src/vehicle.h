@@ -35,6 +35,9 @@ public:
                                                    vector<double> previous_path_x, vector<double> previous_path_y);
     vector<vector<double>> get_waypoint(vector<double> param);
 
+    bool check_safety_of_prev_traj(const vector<vector<double>> &sensor_fusion, const vector<double> &previous_path_x,
+                                   const vector<double> &previous_path_y);
+
     // FSM
     vector<double> get_KL_param(const map<int, Vehicle>& preds);
     vector<double> get_PLCL_param(const map<int, Vehicle>& preds);
