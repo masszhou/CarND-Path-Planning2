@@ -10,7 +10,7 @@
 #define MAP_S_LENGTH 6945.554       // track length = 6945.544 meters
 #define MAP_LANE_WIDTH 4            // meters
 #define LANES_NUMBER                // how many lanes
-#define SENSOR_RANGE 100 //meter
+#define SENSOR_RANGE 200 //meter
 
 
 #define SIM_DT 0.02  // [s]
@@ -19,8 +19,8 @@
 #define MAX_ACCEL 10 // [m/s]
 
 // safety
-#define CRUISE_FOLLOW_DIST 50 //m
-#define TOO_CLOSE_WARNING_DIST 25 //m
+#define CRUISE_FOLLOW_DIST 30 //m
+#define TOO_CLOSE_WARNING_DIST 20 //m
 #define FORWARD_COLLISION_WARNING_DIST 10 // m
 
 #define TRAJECTORY_SIZE 50 // 50 points

@@ -30,7 +30,8 @@ struct Trajectory{
     vector<double> y_vec;
     vector<double> s_vec;
     vector<double> d_vec;
-    double s_target;
+    double s_feasible_ahead;
+    double s_feasible_behind;
     double d_target;
     double v_feasible; // yaw direction
     double v_target;

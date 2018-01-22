@@ -55,6 +55,7 @@ public:
     // helper functions
     map<int, Vehicle> predict_other_vehicles(const vector<vector<double>> &sensor_fusion, double duration);
     bool get_vehicle_ahead(const map<int, Vehicle> &preds, int lane, Vehicle &r_vehicle);
+    bool get_vehicle_behind(const map<int, Vehicle> &preds, int lane, Vehicle &r_vehicle);
     bool get_vehicle_neighbor_lane(const map<int, Vehicle> &preds, int neighbor_lane_id, Vehicle &r_vehicle);
 
     // helper functions
