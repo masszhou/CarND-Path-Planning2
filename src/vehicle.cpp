@@ -560,11 +560,14 @@ double Vehicle::cal_total_cost(const Trajectory &traj, const map<int, Vehicle>& 
     double cost_emegency_break = cal_cost_emergency_break(curr_lane_id, target_lane_id, preds);
 //    double cost_long_lane_change = cal_cost_accumulated_d(traj);
 
-//    cout << "[total cost] in_middle_lane = "<<cost_not_in_center_lane;
-//    cout << ", target_speed = "<<cost_target_speed;
-//    cout << ", lane_change = "<<cost_lane_change;
-//    cout << ", collision = "<<cost_collision_lat;
-//    cout << endl;
+    cout << "[total cost] not_in_center_lane = "<<cost_not_in_center_lane;
+    cout << ", target_speed = "<<cost_target_speed;
+    cout << ", lane_change = "<<cost_lane_change;
+    cout << ", cross_two_lanes = "<<cost_cross_two_lanes;
+    cout << ", collision_lat = "<<cost_collision_lat;
+    cout << ", collision_long = "<<cost_collision_long;
+    cout << ", emergency = "<<cost_emegency_break;
+    cout << endl;
 
     double total_cost = 0.09 * cost_not_in_center_lane + 0.9 * cost_target_speed + 0.08 *cost_lane_change
                         + 10 * cost_collision_lat + cost_cross_two_lanes + 0.5 * cost_collision_long + cost_emegency_break;
@@ -664,7 +667,7 @@ double Vehicle::cal_cost_accumulated_d(const vector<vector<double>> &traj) {
 
 double Vehicle::cal_cost_cross_two_lane(int lane_id_curr, double d_curr, int lane_id_target, double d_target) {
 
-    if (fabs(d_curr-d_target)>(double)MAP_LANE_WIDTH){
+    if (fabs(d_curr-d_target)>(MAP_LANE_WIDTH*1.5)){
         return 1;
     } else {
         return 0;
