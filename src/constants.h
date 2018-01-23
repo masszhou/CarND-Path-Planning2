@@ -19,9 +19,9 @@
 #define MAX_ACCEL 10 // [m/s]
 
 // safety
-#define CRUISE_FOLLOW_DIST 30 //m
-#define TOO_CLOSE_WARNING_DIST 20 //m
-#define FORWARD_COLLISION_WARNING_DIST 10 // m
+#define CRUISE_FOLLOW_DIST 35 //m
+#define TOO_CLOSE_WARNING_DIST 25 //m
+#define FORWARD_COLLISION_WARNING_DIST 15 // m
 
 #define TRAJECTORY_SIZE 50 // 50 points
 
