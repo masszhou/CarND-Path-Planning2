@@ -133,3 +133,6 @@ In my current implementation, the ego car can always drive safety in my test. I 
 
 ### 5. Future works
 In this project, I didn't implement *"prepare lane change"* for this version. In the trajectory structure, I preserved a variable *v_intended*, which can be used to distinguish *"keep lane"* and *"prepare lane change"* in cost functions. I believe with additional *"prepare lane change"* state, the ego car can escape some trapped situation more easily. My current implementation used a local planning view. For example, it will only consider the neighbor lanes instead of considering all lanes. So in current implementation, the ego car could be trapped in left lane or right lane. In the future, it can be improved to considering all lanes, then find a global optimal trajectory.
+
+### 6. Result
+youtube video: https://www.youtube.com/watch?v=iEQ9IgMyPC8
